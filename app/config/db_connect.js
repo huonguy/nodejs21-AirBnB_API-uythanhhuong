@@ -12,13 +12,13 @@ const { Sequelize } = require("sequelize");
 // );
 
 const sequelize = new Sequelize(
-  "heroku_652930bd7ed8003", //database name
-  "b07acb687d3809", //username
-  "e3ca9b30", //password
+  process.env.DATABASE_NAME, //database name
+  process.env.USERNAME, //username
+  process.env.PASSWORD, //password
   {
-    host: "us-cdbr-east-06.cleardb.net", //url sql server, RDMS
-    port: "3306", //port
-    dialect: "mysql", //sql server dang su dung
+    host: process.env.HOST, //url sql server, RDMS
+    port: process.env.PORT, //port
+    dialect: process.env.DIALECT, //sql server dang su dung
   }
 );
 
