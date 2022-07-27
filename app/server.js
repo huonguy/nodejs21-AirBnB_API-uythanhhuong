@@ -2,7 +2,7 @@ const express = require("express");
 const rootRouter = require("./routers/root.router");
 
 const app = express();
-const port = process.env.PORT;
+const port = process.env.PORT || 3000;
 require("dotenv").config(__dirname);
 
 //chuyển req, res về json để tiện thao tác
