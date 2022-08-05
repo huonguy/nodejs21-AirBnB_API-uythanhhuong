@@ -11,7 +11,7 @@ module.exports = function(sequelize, DataTypes) {
       allowNull: true
     },
     description: {
-      type: DataTypes.STRING(255),
+      type: DataTypes.TEXT,
       allowNull: true
     },
     price: {
@@ -29,6 +29,16 @@ module.exports = function(sequelize, DataTypes) {
     image: {
       type: DataTypes.STRING(255),
       allowNull: true
+    },
+    createdDate: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      defaultValue: Sequelize.Sequelize.literal('CURRENT_TIMESTAMP')
+    },
+    valueate: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      defaultValue: 0
     }
   }, {
     sequelize,

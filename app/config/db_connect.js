@@ -1,26 +1,26 @@
 const { Sequelize } = require("sequelize");
 
+const sequelize = new Sequelize(
+  "db_AirBnB", //database name
+  "root", //username
+  "admin123", //password
+  {
+    host: "127.0.0.1", //url sql server, RDMS
+    port: "3308", //port
+    dialect: "mysql", //sql server dang su dung
+  }
+);
+
 // const sequelize = new Sequelize(
-//   "db_AirBnB", //database name
-//   "root", //username
-//   "admin123", //password
+//   "heroku_652930bd7ed8003", //database name
+//   "b07acb687d3809", //username
+//   "e3ca9b30", //password
 //   {
-//     host: "127.0.0.1", //url sql server, RDMS
-//     port: "3308", //port
+//     host: "us-cdbr-east-06.cleardb.net", //url sql server, RDMS
+//     port: "3306", //port
 //     dialect: "mysql", //sql server dang su dung
 //   }
 // );
-
-const sequelize = new Sequelize(
-  process.env.DATABASE_NAME, //database name
-  process.env.USERNAME, //username
-  process.env.PASSWORD, //password
-  {
-    host: process.env.HOST, //url sql server, RDMS
-    port: process.env.PORT, //port
-    dialect: process.env.DIALECT, //sql server dang su dung
-  }
-);
 
 const checkConnect = async () => {
   try {

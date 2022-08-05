@@ -21,6 +21,11 @@ module.exports = function(sequelize, DataTypes) {
         model: 'roles',
         key: '_id'
       }
+    },
+    createdDate: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      defaultValue: Sequelize.Sequelize.literal('CURRENT_TIMESTAMP')
     }
   }, {
     sequelize,

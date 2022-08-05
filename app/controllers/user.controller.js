@@ -2,6 +2,8 @@ const sequelize = require("../config/db_connect");
 const initModels = require("../models/init-models");
 var models = initModels(sequelize);
 
+const path = require("path");
+
 const bcrypt = require("bcryptjs");
 const { createId } = require("../helper/util");
 
@@ -10,10 +12,12 @@ const getAllUser = async (req, res) => {
     // const users = await models.users.findAll();
 
     const [results, metadata] = await sequelize.query(
-      "SELECT * FROM users JOIN users_detail ON users._id = users_detail.userId"
+      `SELECT u._id, u.email, u.password, u.roleId, ud.name, ud.gender, ud.phone, ud.birthday, ud.address, ud.avatar FROM users u
+            JOIN users_detail ud ON u._id = ud.userId`
     );
 
-    res.status(200).send(results);
+    if (results.length != 0) res.status(200).send(results);
+    else res.status(200).send("Không có thông tin người dùng!");
   } catch (error) {
     res.status(500).send(error);
   }
@@ -36,12 +40,16 @@ const getUserById = async (req, res) => {
     });
 
     if (users) {
-      res.status(200).send({
+      const { userId, ...uDetailRest } = usersDetail.dataValues;
+
+      const result = {
         ...users.dataValues,
-        ...usersDetail.dataValues,
-      });
+        ...uDetailRest,
+      };
+
+      res.status(200).send(result);
     } else {
-      res.status(404).send("User Not Found!");
+      res.status(404).send("Người dùng không tồn tại!");
     }
   } catch (error) {
     res.status(500).send(error);
@@ -60,27 +68,38 @@ const createUser = async (req, res) => {
   try {
     const _id = createId();
 
-    const newUsers = await models.users.create({
+    const users = await models.users.create({
       _id,
       email,
       password: hashPassword,
       roleId,
+      createdDate: Date.now(),
     });
 
-    const newUsersDetail = await models.users_detail.create({
+    const usersDetail = await models.users_detail.create({
       userId: _id,
       name,
-      gender,
       phone,
       birthday,
+      gender,
       address,
     });
 
-    res
-      .status(201)
-      .send({ ...newUsers.dataValues, ...newUsersDetail.dataValues });
+    const { userId, avatar, ...uDetailRest } = usersDetail.dataValues;
+
+    const result = {
+      ...users.dataValues,
+      ...uDetailRest,
+    };
+
+    res.status(201).send({
+      message: "Tạo người dùng thành công!",
+      status_code: 201,
+      success: true,
+      user: result,
+    });
   } catch (error) {
-    res.status(500).send(error);
+    res.status(500).send({ error });
   }
 };
 
@@ -94,7 +113,7 @@ const deleteUser = async (req, res) => {
       },
     });
 
-    const existedUsersDetail = await models.users_detail.findOne({
+    await models.users_detail.findOne({
       where: {
         userId: _id,
       },
@@ -113,11 +132,12 @@ const deleteUser = async (req, res) => {
         },
       });
       res.status(200).send({
-        ...existedUsers.dataValues,
-        ...existedUsersDetail.dataValues,
+        message: "Xóa người dùng thành công!",
+        status_code: 200,
+        success: true,
       });
     } else {
-      res.status(404).send("User Not Found!");
+      res.status(404).send("Người dùng không tồn tại!");
     }
   } catch (error) {
     res.status(500).send(error);
@@ -126,17 +146,16 @@ const deleteUser = async (req, res) => {
 
 const updateUser = async (req, res) => {
   const { _id } = req.params;
-  const { email, password, roleId, name, gender, phone, birthday, address } =
-    req.body;
+  const { email, name, phone, birthday, gender, roleId, address } = req.body;
 
   try {
-    const existedUsers = await models.users.findOne({
+    let existedUsers = await models.users.findOne({
       where: {
         _id,
       },
     });
 
-    const existedUsersDetail = await models.users_detail.findOne({
+    let existedUsersDetail = await models.users_detail.findOne({
       where: {
         userId: _id,
       },
@@ -144,23 +163,33 @@ const updateUser = async (req, res) => {
 
     if (existedUsers) {
       existedUsers.email = email;
-      existedUsers.password = password;
       existedUsers.roleId = roleId;
+      existedUsers.createdDate = Date.now();
 
       existedUsersDetail.name = name;
-      existedUsersDetail.gender = gender;
       existedUsersDetail.phone = phone;
       existedUsersDetail.birthday = birthday;
+      existedUsersDetail.gender = gender;
       existedUsersDetail.address = address;
 
       await existedUsers.save();
       await existedUsersDetail.save();
 
-      res
-        .status(200)
-        .send({ ...existedUsers.dataValues, ...existedUsersDetail.dataValues });
+      const { userId, ...uDetailRest } = existedUsersDetail.dataValues;
+
+      const result = {
+        ...existedUsers.dataValues,
+        ...uDetailRest,
+      };
+
+      res.status(200).send({
+        message: "Cập nhật người dùng thành công!",
+        status_code: 200,
+        success: true,
+        user: result,
+      });
     } else {
-      res.status(404).send("User Not Found!");
+      res.status(404).send("Người dùng không tồn tại!");
     }
   } catch (error) {
     res.status(500).send(error);
@@ -173,7 +202,7 @@ const uploadAvatar = async (req, res) => {
 
   try {
     if (!req.file) {
-      res.status(404).send("No File Uploaded!");
+      res.status(404).send("Chưa chọn hình ảnh!");
     } else {
       let existedUsers = await models.users.findOne({
         where: {
@@ -188,15 +217,29 @@ const uploadAvatar = async (req, res) => {
       });
 
       if (existedUsers) {
-        existedUsersDetail.avatar = avatar;
+        existedUsers.createdDate = Date.now();
+        existedUsersDetail.avatar =
+          req.protocol +
+          "://" +
+          path.join(req.headers.host, avatar).replace(/\\/g, "/");
 
         await existedUsersDetail.save();
-        res.status(200).send({
+
+        const { userId, ...uDetailRest } = existedUsersDetail.dataValues;
+
+        const result = {
           ...existedUsers.dataValues,
-          ...existedUsersDetail.dataValues,
+          ...uDetailRest,
+        };
+
+        res.status(200).send({
+          message: "Cập nhật ảnh người dùng thành công!",
+          status_code: 200,
+          success: true,
+          user: result,
         });
       } else {
-        res.status(404).send("User Not Found!");
+        res.status(404).send("Người dùng không tồn tại!");
       }
     }
   } catch (error) {

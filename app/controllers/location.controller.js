@@ -2,15 +2,23 @@ const sequelize = require("../config/db_connect");
 const initModels = require("../models/init-models");
 var models = initModels(sequelize);
 
+const path = require("path");
+
 const { createId } = require("../helper/util");
 
 const getAllLocation = async (req, res) => {
   try {
-    const locations = await models.location.findAll();
+    // const locations = await models.location.findAll();
 
-    res.status(200).send(locations);
+    const [results, metadata] = await sequelize.query(
+      `SELECT l._id, l.name, p._id as provinceId, p.countryId, l.valueate, l.image FROM location l 
+            JOIN province p ON l.provinceId = p._id`
+    );
+
+    if (results.length != 0) res.status(200).send(results);
+    else res.status(200).send("Không có thông tin địa điểm!");
   } catch (error) {
-    res.status(500).send(error);
+    res.status(500).send({ error });
   }
 };
 
@@ -24,30 +32,21 @@ const getLocationById = async (req, res) => {
       },
     });
 
-    if (location) {
-      res.status(200).send(location);
-    } else {
-      res.status(404).send("Location Not Found!");
-    }
-  } catch (error) {
-    res.status(500).send(error);
-  }
-};
-
-const getLocationByValueate = async (req, res) => {
-  const { valueate } = req.query;
-
-  try {
-    const locations = await models.location.findAll({
+    const province = await models.province.findOne({
       where: {
-        valueate,
+        _id: location.provinceId,
       },
     });
 
-    if (locations.length != 0) {
-      res.status(200).send(locations);
+    if (location) {
+      const result = {
+        ...location.dataValues,
+        countryId: province.countryId,
+      };
+
+      res.status(200).send(result);
     } else {
-      res.status(404).send("Location Not Found!");
+      res.status(404).send("Địa điểm không tồn tại!");
     }
   } catch (error) {
     res.status(500).send(error);
@@ -57,15 +56,35 @@ const getLocationByValueate = async (req, res) => {
 const createLocation = async (req, res) => {
   try {
     const _id = createId();
+    const { name, provinceId, valueate } = req.body;
 
     const newLocation = await models.location.create({
       _id,
-      ...req.body,
+      name,
+      provinceId,
+      valueate,
+      createdDate: Date.now(),
     });
 
-    res.status(201).send(newLocation);
+    const province = await models.province.findOne({
+      where: {
+        _id: provinceId,
+      },
+    });
+
+    const result = {
+      ...newLocation.dataValues,
+      countryId: province.countryId,
+    };
+
+    res.status(201).send({
+      message: "Tạo địa điểm thành công!",
+      status_code: 201,
+      success: true,
+      location: result,
+    });
   } catch (error) {
-    res.status(500).send(error);
+    res.status(500).send({ error });
   }
 };
 
@@ -86,9 +105,13 @@ const deleteLocation = async (req, res) => {
         },
       });
 
-      res.status(200).send(existedLocation);
+      res.status(200).send({
+        message: "Xóa địa điểm thành công!",
+        status_code: 200,
+        success: true,
+      });
     } else {
-      res.status(404).send("Location Not Found!");
+      res.status(404).send("Địa điểm không tồn tại!");
     }
   } catch (error) {
     res.status(500).send(error);
@@ -97,7 +120,7 @@ const deleteLocation = async (req, res) => {
 
 const updateLocation = async (req, res) => {
   const { _id } = req.params;
-  const { location_name, provinceId, valueate } = req.body;
+  const { name, provinceId, valueate } = req.body;
 
   try {
     let existedLocation = await models.location.findOne({
@@ -106,16 +129,33 @@ const updateLocation = async (req, res) => {
       },
     });
 
+    const province = await models.province.findOne({
+      where: {
+        _id: provinceId,
+      },
+    });
+
     if (existedLocation) {
-      existedLocation.locationName = location_name;
+      existedLocation.name = name;
       existedLocation.provinceId = provinceId;
       existedLocation.valueate = valueate;
+      existedLocation.createdDate = Date.now();
 
       await existedLocation.save();
 
-      res.status(200).send(existedLocation);
+      const result = {
+        ...existedLocation.dataValues,
+        countryId: province.countryId,
+      };
+
+      res.status(200).send({
+        message: "Cập nhật địa điểm thành công!",
+        status_code: 200,
+        success: true,
+        location: result,
+      });
     } else {
-      res.status(404).send("Location Not Found!");
+      res.status(404).send("Địa điểm không tồn tại!");
     }
   } catch (error) {
     res.status(500).send(error);
@@ -128,7 +168,7 @@ const uploadLocImage = async (req, res) => {
 
   try {
     if (!req.file) {
-      res.status(404).send("No File Uploaded!");
+      res.status(404).send("Chưa chọn hình ảnh!");
     } else {
       let existedLocation = await models.location.findOne({
         where: {
@@ -136,13 +176,33 @@ const uploadLocImage = async (req, res) => {
         },
       });
 
+      const province = await models.province.findOne({
+        where: {
+          _id: existedLocation.provinceId,
+        },
+      });
+
       if (existedLocation) {
-        existedLocation.image = location;
+        existedLocation.createdDate = Date.now();
+        existedLocation.image =
+          req.protocol +
+          "://" +
+          path.join(req.headers.host, location).replace(/\\/g, "/");
 
         await existedLocation.save();
-        res.status(200).send(existedLocation);
+
+        const result = {
+          ...existedLocation.dataValues,
+          countryId: province.countryId,
+        };
+        res.status(200).send({
+          message: "Cập nhật ảnh địa điểm thành công!",
+          status_code: 200,
+          success: true,
+          location: result,
+        });
       } else {
-        res.status(404).send("Location Not Found!");
+        res.status(404).send("Địa điểm không tồn tại!");
       }
     }
   } catch (error) {
@@ -153,7 +213,6 @@ const uploadLocImage = async (req, res) => {
 module.exports = {
   getAllLocation,
   getLocationById,
-  getLocationByValueate,
   createLocation,
   deleteLocation,
   updateLocation,

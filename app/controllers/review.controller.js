@@ -14,10 +14,22 @@ const getReviewById = async (req, res) => {
       },
     });
 
+    const userDetail = await models.users_detail.findOne({
+      where: {
+        userId: req.user._id,
+      },
+    });
+
     if (review) {
-      res.status(200).send(review);
+      const result = {
+        ...review.dataValues,
+        userName: userDetail.name,
+        userAvatar: userDetail.avatar,
+      };
+
+      res.status(200).send(result);
     } else {
-      res.status(200).send("Review Not Found!");
+      res.status(200).send("Đánh giá không tồn tại!");
     }
   } catch (error) {
     res.status(500).send(error);
@@ -28,16 +40,19 @@ const getReviewByRoom = async (req, res) => {
   const { roomId } = req.query;
 
   try {
-    const reviews = await models.review.findAll({
-      where: {
-        roomId,
-      },
-    });
+    const [results, metadata] = await sequelize.query(
+      `SELECT r._id, r.content, r.createdDate, r.userId, r.roomId, ud.name as userName, ud.avatar as userAvatar FROM review r
+          JOIN users_detail ud ON ud.userId = r.userId
+          WHERE r.roomId = :roomId`,
+      {
+        replacements: { roomId },
+      }
+    );
 
-    if (reviews.length != 0) {
-      res.status(200).send(reviews);
+    if (results.length != 0) {
+      res.status(200).send(results);
     } else {
-      res.status(200).send("Review Not Found!");
+      res.status(200).send("Không có thông tin đánh giá!");
     }
   } catch (error) {
     res.status(500).send(error);
@@ -54,8 +69,27 @@ const createReview = async (req, res) => {
       content,
       userId: req.user._id,
       roomId,
+      createdDate: Date.now(),
     });
-    res.status(200).send(newReview);
+
+    const userDetail = await models.users_detail.findOne({
+      where: {
+        userId: req.user._id,
+      },
+    });
+
+    const result = {
+      ...newReview.dataValues,
+      userName: userDetail.name,
+      userAvatar: userDetail.avatar,
+    };
+
+    res.status(200).send({
+      message: "Tạo đánh giá thành công!",
+      status_code: 201,
+      success: true,
+      review: result,
+    });
   } catch (error) {
     res.status(500).send(error);
   }
@@ -76,9 +110,13 @@ const deleteReview = async (req, res) => {
           _id,
         },
       });
-      res.status(200).send(existedReview);
+      res.status(200).send({
+        message: "Xóa đánh giá thành công!",
+        status_code: 200,
+        success: true,
+      });
     } else {
-      res.status(200).send("Review Not Found!");
+      res.status(404).send("Đánh giá không tồn tại!");
     }
   } catch (error) {
     res.status(500).send(error);
@@ -96,14 +134,33 @@ const updateReview = async (req, res) => {
       },
     });
 
+    const userDetail = await models.users_detail.findOne({
+      where: {
+        userId: req.user._id,
+      },
+    });
+
     if (existedReview) {
       existedReview.content = content;
-      await existedReview.save();
-    } else {
-      res.status(200).send("Review Not Found!");
-    }
+      existedReview.createdDate = Date.now();
 
-    res.status(200).send(existedReview);
+      await existedReview.save();
+
+      const result = {
+        ...existedReview.dataValues,
+        userName: userDetail.name,
+        userAvatar: userDetail.avatar,
+      };
+
+      res.status(200).send({
+        message: "Cập nhật đánh giá thành công!",
+        status_code: 200,
+        success: true,
+        review: result,
+      });
+    } else {
+      res.status(200).send("Đánh giá không tồn tại!");
+    }
   } catch (error) {
     res.status(500).send(error);
   }

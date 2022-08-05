@@ -5,7 +5,6 @@ const {
   createLocation,
   deleteLocation,
   updateLocation,
-  getLocationByValueate,
   uploadLocImage,
 } = require("../controllers/location.controller");
 
@@ -14,7 +13,6 @@ const { uploadImage } = require("../helper/util");
 
 const locationRouter = express.Router();
 
-locationRouter.get("/by-valueate", getLocationByValueate);
 locationRouter.get("/:_id", getLocationById);
 locationRouter.get("/", getAllLocation);
 locationRouter.post("/", authenticate, authorize(["ADMIN"]), createLocation);

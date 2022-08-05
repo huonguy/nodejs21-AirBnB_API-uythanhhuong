@@ -17,12 +17,6 @@ const login = async (req, res) => {
       },
     });
 
-    const userDetail = await models.users_detail.findOne({
-      where: {
-        userId: user._id,
-      },
-    });
-
     const role = await models.roles.findOne({
       where: {
         _id: user.roleId,
@@ -32,13 +26,7 @@ const login = async (req, res) => {
     const payload = {
       _id: user._id,
       email: user.email,
-      role: role.role_type,
-      name: userDetail.name,
-      gender: userDetail.gender,
-      phone: userDetail.phone,
-      birthday: userDetail.birthday,
-      address: userDetail.address,
-      avatar: userDetail.avatar,
+      type: role.type,
     };
 
     if (user != null) {
@@ -49,16 +37,16 @@ const login = async (req, res) => {
         const token = generateToken(payload);
 
         res.status(200).send({
-          message: "Loggin successfully!",
+          message: "Đăng Nhập Thành Công!",
           status_code: 200,
           success: true,
-          access_token: token,
+          token: token,
         });
       }
     } else {
       //Đăng nhập thất bại
       res.status(401).send({
-        message: "Login failed. Please try again!",
+        message: "Đăng Nhập Thất Bại. Thử lần nữa!",
         status_code: 401,
         success: false,
       });
@@ -84,20 +72,20 @@ const register = async (req, res) => {
       _id,
       email,
       password: hashPassword,
-      roleId,
+      roleId: 1,
     });
 
     await models.users_detail.create({
       userId: _id,
       name,
-      gender,
       phone,
       birthday,
+      gender,
       address,
     });
 
     res.status(201).send({
-      message: "Register successfully!",
+      message: "Đăng Ký Thành Công!",
       status_code: 201,
       success: true,
     });
@@ -118,7 +106,7 @@ const authenticate = (req, res, next) => {
       return next();
     } else {
       res.status(401).send({
-        message: "You have not logged in!",
+        message: "Bạn chưa đăng nhập!",
         status_code: 401,
         success: false,
       });
@@ -132,11 +120,11 @@ const authenticate = (req, res, next) => {
 const authorize = (arrType) => (req, res, next) => {
   const { user } = req;
   console.log("user", user);
-  if (arrType.findIndex((ele) => ele === user.role) > -1) {
+  if (arrType.findIndex((ele) => ele === user.type) > -1) {
     return next();
   } else {
     res.status(403).send({
-      message: "You are not authorized to perform this action!",
+      message: "Bạn không được cấp quyền để thực hiện hành động này!",
       status_code: 403,
       success: false,
     });

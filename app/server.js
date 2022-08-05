@@ -5,6 +5,13 @@ const app = express();
 const port = process.env.PORT || 3000;
 require("dotenv").config(__dirname);
 
+const cors = require("cors");
+app.use(
+  cors({
+    origin: "*",
+  })
+);
+
 //chuyển req, res về json để tiện thao tác
 app.use(express.json());
 

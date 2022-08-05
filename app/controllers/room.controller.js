@@ -2,7 +2,23 @@ const sequelize = require("../config/db_connect");
 const initModels = require("../models/init-models");
 var models = initModels(sequelize);
 
+const path = require("path");
+
 const { createId } = require("../helper/util");
+
+const getAllRoom = async (req, res) => {
+  try {
+    const [results, metadata] = await sequelize.query(
+      `SELECT * FROM room r
+          JOIN room_detail rd ON r._id = rd.roomId`
+    );
+
+    if (results.length != 0) res.status(200).send(results);
+    else res.status(200).send("Không có thông tin phòng!");
+  } catch (error) {
+    res.status(500).send(error);
+  }
+};
 
 const getRoomById = async (req, res) => {
   const { _id } = req.params;
@@ -19,13 +35,31 @@ const getRoomById = async (req, res) => {
       },
     });
 
+    const location = await models.location.findOne({
+      where: {
+        _id: room.locationId,
+      },
+    });
+
+    const province = await models.province.findOne({
+      where: {
+        _id: location.provinceId,
+      },
+    });
+
     if (room) {
-      res.status(200).send({
+      const { roomId, ...rDetailRest } = roomDetail.dataValues;
+
+      const result = {
         ...room.dataValues,
-        ...roomDetail.dataValues,
-      });
+        ...rDetailRest,
+        location: location.name,
+        province: province.name,
+      };
+
+      res.status(200).send(result);
     } else {
-      res.status(404).send("Room Not Found!");
+      res.status(404).send("Phòng không tồn tại!");
     }
   } catch (error) {
     res.status(500).send(error);
@@ -36,16 +70,34 @@ const getRoomByLocation = async (req, res) => {
   const { locationId } = req.query;
 
   try {
-    const locations = await models.room.findAll({
+    const rooms = await models.room.findAll({
       where: {
         locationId,
       },
     });
 
-    if (locations.length != 0) {
-      res.status(200).send(locations);
+    const location = await models.location.findOne({
+      where: {
+        _id: locationId,
+      },
+    });
+
+    const province = await models.province.findOne({
+      where: {
+        _id: location.provinceId,
+      },
+    });
+
+    if (rooms.length != 0) {
+      const result = {
+        rooms: [...rooms],
+        location: location.name,
+        province: province.name,
+      };
+
+      res.status(200).send(result);
     } else {
-      res.status(404).send("Location Not Found!");
+      res.status(404).send("Phòng không tồn tại!");
     }
   } catch (error) {
     res.status(500).send(error);
@@ -58,6 +110,7 @@ const createRoom = async (req, res) => {
     description,
     price,
     locationId,
+    valueate,
     guests,
     bedRoom,
     bath,
@@ -82,6 +135,8 @@ const createRoom = async (req, res) => {
       description,
       price,
       locationId,
+      valueate,
+      createdDate: Date.now(),
     });
 
     const newRoomDetail = await models.room_detail.create({
@@ -101,9 +156,20 @@ const createRoom = async (req, res) => {
       cableTV,
     });
 
-    res
-      .status(201)
-      .send({ ...newRoom.dataValues, ...newRoomDetail.dataValues });
+    const { image, ...rRest } = newRoom.dataValues;
+    const { roomId, ...rDetailRest } = newRoomDetail.dataValues;
+
+    const result = {
+      ...rRest,
+      ...rDetailRest,
+    };
+
+    res.status(201).send({
+      message: "Tạo phòng thành công!",
+      status_code: 201,
+      success: true,
+      room: result,
+    });
   } catch (error) {
     res.status(500).send(error);
   }
@@ -119,7 +185,7 @@ const deleteRoom = async (req, res) => {
       },
     });
 
-    const existedRoomDetail = await models.room_detail.findOne({
+    await models.room_detail.findOne({
       where: {
         roomId: _id,
       },
@@ -139,11 +205,12 @@ const deleteRoom = async (req, res) => {
       });
 
       res.status(200).send({
-        ...existedRoom.dataValues,
-        ...existedRoomDetail.dataValues,
+        message: "Xóa phòng thành công!",
+        status_code: 200,
+        success: true,
       });
     } else {
-      res.status(404).send("Room Not Found!");
+      res.status(404).send("Phòng không tồn tại!");
     }
   } catch (error) {
     res.status(500).send(error);
@@ -157,6 +224,7 @@ const updateRoom = async (req, res) => {
     description,
     price,
     locationId,
+    valueate,
     guests,
     bedRoom,
     bath,
@@ -190,13 +258,15 @@ const updateRoom = async (req, res) => {
       existedRoom.description = description;
       existedRoom.price = price;
       existedRoom.locationId = locationId;
+      existedRoom.valueate = valueate;
+      existedRoom.createdDate = Date.now();
 
       existedRoomDetail.guests = guests;
       existedRoomDetail.bedRoom = bedRoom;
       existedRoomDetail.bath = bath;
       existedRoomDetail.elevator = elevator;
       existedRoomDetail.hotTub = hotTub;
-      existedRoom.pool = pool;
+      existedRoomDetail.pool = pool;
       existedRoomDetail.indoorFireplace = indoorFireplace;
       existedRoomDetail.dryer = dryer;
       existedRoomDetail.gym = gym;
@@ -208,11 +278,21 @@ const updateRoom = async (req, res) => {
       await existedRoom.save();
       await existedRoomDetail.save();
 
-      res
-        .status(200)
-        .send({ ...existedRoom.dataValues, ...existedRoomDetail.dataValues });
+      const { roomId, ...rDetailRest } = existedRoomDetail.dataValues;
+
+      const result = {
+        ...existedRoom.dataValues,
+        ...rDetailRest,
+      };
+
+      res.status(200).send({
+        message: "Cập nhật phòng thành công!",
+        status_code: 200,
+        success: true,
+        room: result,
+      });
     } else {
-      res.status(404).send("Room Not Found!");
+      res.status(404).send("Phòng không tồn tại!");
     }
   } catch (error) {
     res.status(500).send(error);
@@ -225,7 +305,7 @@ const uploadRoomImage = async (req, res) => {
 
   try {
     if (!req.file) {
-      res.status(404).send("No File Uploaded!");
+      res.status(404).send("Chưa chọn hình ảnh!");
     } else {
       let existedRoom = await models.room.findOne({
         where: {
@@ -240,14 +320,29 @@ const uploadRoomImage = async (req, res) => {
       });
 
       if (existedRoom) {
-        existedRoom.image = room;
+        existedRoom.createdDate = Date.now();
+        existedRoom.image =
+          req.protocol +
+          "://" +
+          path.join(req.headers.host, room).replace(/\\/g, "/");
 
         await existedRoom.save();
-        res
-          .status(200)
-          .send({ ...existedRoom.dataValues, ...existedRoomDetail.dataValues });
+
+        const { roomId, ...rDetailRest } = existedRoomDetail.dataValues;
+
+        const result = {
+          ...existedRoom.dataValues,
+          ...rDetailRest,
+        };
+
+        res.status(200).send({
+          message: "Cập nhật ảnh phòng thành công!",
+          status_code: 200,
+          success: true,
+          room: result,
+        });
       } else {
-        res.status(404).send("Room Not Found!");
+        res.status(404).send("Phòng không tồn tại!");
       }
     }
   } catch (error) {
@@ -256,7 +351,7 @@ const uploadRoomImage = async (req, res) => {
 };
 
 const reserveRoom = async (req, res) => {
-  const { roomId, checkIn, checkOut } = req.body;
+  const { roomId, checkIn, checkOut, totalPrice } = req.body;
   const userId = req.user._id;
 
   try {
@@ -266,8 +361,10 @@ const reserveRoom = async (req, res) => {
       _id,
       checkIn,
       checkOut,
+      totalPrice,
       roomId,
       userId,
+      createdDate: Date.now(),
     });
 
     const tickets = await models.ticket.findAll({
@@ -278,7 +375,7 @@ const reserveRoom = async (req, res) => {
     });
 
     res.status(201).send({
-      message: "You successfully created your booking!",
+      message: "Bạn đã đặt phòng thành công!",
       userDetail: {
         tickets: tickets.map((ticket) => {
           return ticket.dataValues._id;
@@ -294,6 +391,7 @@ const reserveRoom = async (req, res) => {
 module.exports = {
   getRoomById,
   getRoomByLocation,
+  getAllRoom,
   createRoom,
   deleteRoom,
   updateRoom,
